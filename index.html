@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2次曲面 z = (y - x²)(y - 2x²) の原点近傍の可視化</title>
+    <!-- Tailwind CSS for UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- MathJax for Computer Modern LaTeX math rendering -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Times New Roman', serif; /* LaTeX-like serif fallback */
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        /* Glassmorphic UI styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen select-none">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="w-full h-full absolute inset-0"></div>
+
+    <!-- Header Overlay -->
+    <header class="absolute top-4 left-4 z-10 glass-panel p-4 rounded-xl shadow-2xl max-w-md border-l-4 border-indigo-500">
+        <h1 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-cube text-indigo-400"></i> 解析学：極値判定の補助資料
+        </h1>
+        <p class="text-sm text-slate-300 mt-1">
+            曲面: $\displaystyle z = f(x,y) = (y - x^2)(y - 2x^2)$
+        </p>
+    </header>
+
+    <!-- Mathematical Explanation Panel (Left Sidebar) -->
+    <div class="absolute top-24 left-4 z-10 glass-panel p-5 rounded-xl shadow-2xl max-w-md max-h-[calc(100vh-130px)] overflow-y-auto">
+        <h2 class="text-base font-semibold text-indigo-300 border-b border-slate-700 pb-2 mb-3 flex items-center justify-between">
+            <span><i class="fa-solid fa-square-root-variable mr-1"></i> 極値をとらない理由（解説）</span>
+        </h2>
+        
+        <div class="space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed">
+            <p>
+                原点 $(0,0)$ において偏微分係数は $f_x(0,0)=0$, $f_y(0,0)=0$ ですが、2階偏導関数による判別式は $B^2 - AC = 0$ となり判定不能です。
+            </p>
+            <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                <p class="font-medium text-amber-400 mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 符号の挙動 ($f(0,0)=0$):</p>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                    <li><span class="text-rose-400 font-semibold">$x^2 < y < 2x^2$</span> のとき: <br>&emsp;$(y-x^2)>0$ かつ $(y-2x^2)<0$ $\Rightarrow$ <strong class="text-rose-400">$f(x,y) < 0$ (負)</strong></li>
+                    <li><span class="text-cyan-400 font-semibold">$y < x^2$ または $y > 2x^2$</span> のとき: <br>&emsp;両因数が同符号 $\Rightarrow$ <strong class="text-cyan-400">$f(x,y) > 0$ (正)</strong></li>
+                    <li><span class="text-emerald-400 font-semibold">$y = x^2$ または $y = 2x^2$</span> 上: <br>&emsp;<strong class="text-emerald-400">$f(x,y) = 0$ (境界線)</strong></li>
+                </ul>
+            </div>
+            <p class="text-slate-300">
+                原点 $(0,0)$ のどんなに小さな近傍をとっても、その中に $f(x,y)>0$ となる点と $f(x,y)<0$ となる点が存在します。したがって、原点で<b>極値をとらない</b>ことが分かります。
+            </p>
+        </div>
+    </div>
+
+    <!-- Interactive Control Panel (Right Floating) -->
+    <div class="absolute top-4 right-4 z-10 glass-panel p-5 rounded-xl shadow-2xl w-80">
+        <h2 class="text-base font-semibold text-indigo-300 border-b border-slate-700 pb-2 mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-sliders"></i> コントロールパネル
+        </h2>
+
+        <div class="space-y-4 text-xs sm:text-sm">
+            <!-- Z Scale Slider -->
+            <div>
+                <div class="flex justify-between text-slate-300 mb-1">
+                    <span>Z軸（高さ）の強調倍率</span>
+                    <span id="zScaleVal" class="font-mono text-indigo-400 font-bold">5.0x</span>
+                </div>
+                <input type="range" id="zScale" min="0.5" max="15.0" step="0.5" value="5.0"
+                    class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                <span class="text-[11px] text-slate-400">※原点付近の起伏は極めて微小なため高さを強調しています</span>
+            </div>
+
+            <!-- View Domain Range (XY Bounds) -->
+            <div>
+                <div class="flex justify-between text-slate-300 mb-1">
+                    <span>表示範囲 ($x, y$ の切り出し)</span>
+                    <span id="domainVal" class="font-mono text-indigo-400 font-bold">[-1.2, 1.2]</span>
+                </div>
+                <input type="range" id="domainRange" min="0.5" max="2.0" step="0.1" value="1.2"
+                    class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+            </div>
+
+            <!-- Mesh Resolution -->
+            <div>
+                <div class="flex justify-between text-slate-300 mb-1">
+                    <span>メッシュ解像度</span>
+                    <span id="resVal" class="font-mono text-indigo-400 font-bold">120x120</span>
+                </div>
+                <input type="range" id="resolution" min="40" max="200" step="20" value="120"
+                    class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+            </div>
+
+            <hr class="border-slate-700/60 my-3">
+
+            <!-- Toggle Options -->
+            <div class="space-y-2">
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-slate-200 group-hover:text-white">補助線 ($y=x^2, y=2x^2$)</span>
+                    <input type="checkbox" id="showAuxCurves" checked class="sr-only peer">
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 relative"></div>
+                </label>
+
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-slate-200 group-hover:text-white">符号別カラーマップ ($f>0$ / $f<0$)</span>
+                    <input type="checkbox" id="colorBySign" checked class="sr-only peer">
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500 relative"></div>
+                </label>
+
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-slate-200 group-hover:text-white">ワイヤーフレーム表示</span>
+                    <input type="checkbox" id="showWireframe" class="sr-only peer">
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500 relative"></div>
+                </label>
+
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-slate-200 group-hover:text-white">XY平面格子グリッド</span>
+                    <input type="checkbox" id="showGrid" checked class="sr-only peer">
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500 relative"></div>
+                </label>
+            </div>
+
+            <button id="resetCamBtn" class="w-full mt-2 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-rotate-left"></i> 視点をリセット
+            </button>
+        </div>
+    </div>
+
+    <!-- Legend Overlay (Bottom Right) -->
+    <div class="absolute bottom-4 right-4 z-10 glass-panel p-3 rounded-xl shadow-xl flex items-center gap-4 text-xs">
+        <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded-full bg-cyan-500 inline-block"></span>
+            <span>$f(x,y) > 0$ (正の領域)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded-full bg-rose-500 inline-block"></span>
+            <span>$f(x,y) < 0$ (谷の領域)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-0.5 bg-emerald-400 inline-block"></span>
+            <span>$f=0$ ($y=x^2, 2x^2$)</span>
+        </div>
+    </div>
+
+    <!-- Three.js Visualizer Script -->
+    <script>
+        // --- 1. Scene Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // Tailwind slate-900
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        const defaultCamPos = new THREE.Vector3(2.8, 3.5, 4.2);
+        camera.position.copy(defaultCamPos);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // OrbitControls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0, 0);
+
+        // --- 2. Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight1.position.set(5, 10, 7);
+        dirLight1.castShadow = true;
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.4); // Cool blue fill light
+        dirLight2.position.set(-5, -5, -5);
+        scene.add(dirLight2);
+
+        // --- 3. Helpers (Axes & Grid) ---
+        // Note: In Three.js, Y is UP. We map math coordinates (x, y, z) to Three.js (X, Z, Y)
+        // Math X -> Three.js X
+        // Math Y -> Three.js Z
+        // Math Z -> Three.js Y (Vertical)
+
+        const gridHelper = new THREE.GridHelper(6, 20, 0x475569, 0x334155);
+        gridHelper.position.y = -0.001; // Slightly below zero to avoid z-fighting
+        scene.add(gridHelper);
+
+        // Custom Axes Helper with Labels
+        const axesGroup = new THREE.Group();
+        scene.add(axesGroup);
+
+        function createAxis(from, to, color) {
+            const geom = new THREE.BufferGeometry().setFromPoints([from, to]);
+            const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+            return new THREE.Line(geom, mat);
+        }
+
+        // X-axis (Red)
+        axesGroup.add(createAxis(new THREE.Vector3(-2.5, 0, 0), new THREE.Vector3(2.5, 0, 0), 0xef4444));
+        // Y-axis in math = Z-axis in Three.js (Green)
+        axesGroup.add(createAxis(new THREE.Vector3(0, 0, -2.5), new THREE.Vector3(0, 0, 2.5), 0x22c55e));
+        // Z-axis in math = Y-axis in Three.js (Blue)
+        axesGroup.add(createAxis(new THREE.Vector3(0, -2.5, 0), new THREE.Vector3(0, 2.5, 0), 0x3b82f6));
+
+        // --- 4. Dynamic Surface Mesh Generation ---
+        let surfaceMesh = null;
+        let curveMesh1 = null;
+        let curveMesh2 = null;
+
+        // UI Parameters
+        const params = {
+            zScale: 5.0,
+            domain: 1.2,
+            resolution: 120,
+            showAuxCurves: true,
+            colorBySign: true,
+            showWireframe: false,
+            showGrid: true
+        };
+
+        // Mathematical Function
+        function f(x, y) {
+            return (y - x * x) * (y - 2 * x * x);
+        }
+
+        function buildSurface() {
+            if (surfaceMesh) scene.remove(surfaceMesh);
+
+            const res = parseInt(params.resolution);
+            const domain = parseFloat(params.domain);
+            const zScale = parseFloat(params.zScale);
+
+            const geometry = new THREE.PlaneGeometry(domain * 2, domain * 2, res, res);
+            geometry.rotateX(-Math.PI / 2); // Rotate to lie in XZ plane (Math XY)
+
+            const posAttr = geometry.attributes.position;
+            const colors = [];
+
+            const colorPos = new THREE.Color(0x06b6d4); // Cyan for f > 0
+            const colorNeg = new THREE.Color(0xf43f5e); // Rose red for f < 0
+            const colorZero = new THREE.Color(0x10b981); // Emerald green for boundary f ≈ 0
+
+            for (let i = 0; i < posAttr.count; i++) {
+                const x = posAttr.getX(i);
+                const y = posAttr.getZ(i); // Three Z is Math Y
+
+                const zVal = f(x, y);
+                posAttr.setY(i, zVal * zScale); // Three Y is Math Z (Height)
+
+                // Vertex Coloring based on sign of f(x,y)
+                if (params.colorBySign) {
+                    if (Math.abs(zVal) < 0.005) {
+                        colors.push(colorZero.r, colorZero.g, colorZero.b);
+                    } else if (zVal > 0) {
+                        // Smooth gradient for positive values
+                        const intensity = Math.min(zVal * 2, 1);
+                        const c = colorPos.clone().lerp(new THREE.Color(0x3b82f6), intensity * 0.5);
+                        colors.push(c.r, c.g, c.b);
+                    } else {
+                        // Smooth gradient for negative values
+                        const intensity = Math.min(Math.abs(zVal) * 5, 1);
+                        const c = colorNeg.clone().lerp(new THREE.Color(0xd97706), intensity * 0.3);
+                        colors.push(c.r, c.g, c.b);
+                    }
+                } else {
+                    // Default sleek metallic cyan tint
+                    const c = new THREE.Color(0x38bdf8);
+                    colors.push(c.r, c.g, c.b);
+                }
+            }
+
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshStandardMaterial({
+                vertexColors: params.colorBySign,
+                color: params.colorBySign ? 0xffffff : 0x38bdf8,
+                side: THREE.DoubleSide,
+                roughness: 0.3,
+                metalness: 0.1,
+                wireframe: params.showWireframe,
+                transparent: true,
+                opacity: 0.92
+            });
+
+            surfaceMesh = new THREE.Mesh(geometry, material);
+            surfaceMesh.castShadow = true;
+            surfaceMesh.receiveShadow = true;
+            scene.add(surfaceMesh);
+        }
+
+        // --- 5. Auxiliary Curves (y = x^2 and y = 2x^2) ---
+        function buildAuxCurves() {
+            if (curveMesh1) scene.remove(curveMesh1);
+            if (curveMesh2) scene.remove(curveMesh2);
+
+            if (!params.showAuxCurves) return;
+
+            const domain = parseFloat(params.domain);
+            const zScale = parseFloat(params.zScale);
+            const points1 = [];
+            const points2 = [];
+            const steps = 200;
+
+            for (let i = 0; i <= steps; i++) {
+                const x = -domain + (2 * domain * i) / steps;
+                
+                // Curve 1: y = x^2
+                const y1 = x * x;
+                if (Math.abs(y1) <= domain) {
+                    const z1 = f(x, y1); // Exactly 0
+                    points1.push(new THREE.Vector3(x, z1 * zScale + 0.005, y1));
+                }
+
+                // Curve 2: y = 2x^2
+                const y2 = 2 * x * x;
+                if (Math.abs(y2) <= domain) {
+                    const z2 = f(x, y2); // Exactly 0
+                    points2.push(new THREE.Vector3(x, z2 * zScale + 0.005, y2));
+                }
+            }
+
+            // Create thick tube or line for curves
+            const path1 = new THREE.CatmullRomCurve3(points1);
+            const geom1 = new THREE.TubeGeometry(path1, 100, 0.012, 8, false);
+            const mat1 = new THREE.MeshBasicMaterial({ color: 0x10b981 }); // Emerald green
+            curveMesh1 = new THREE.Mesh(geom1, mat1);
+            scene.add(curveMesh1);
+
+            const path2 = new THREE.CatmullRomCurve3(points2);
+            const geom2 = new THREE.TubeGeometry(path2, 100, 0.012, 8, false);
+            const mat2 = new THREE.MeshBasicMaterial({ color: 0xf59e0b }); // Amber yellow
+            curveMesh2 = new THREE.Mesh(geom2, mat2);
+            scene.add(curveMesh2);
+        }
+
+        // --- 6. Initial Render & Event Listeners ---
+        function updateAll() {
+            buildSurface();
+            buildAuxCurves();
+        }
+
+        // UI Event Handlers
+        document.getElementById('zScale').addEventListener('input', (e) => {
+            params.zScale = e.target.value;
+            document.getElementById('zScaleVal').innerText = `${parseFloat(e.target.value).toFixed(1)}x`;
+            updateAll();
+        });
+
+        document.getElementById('domainRange').addEventListener('input', (e) => {
+            params.domain = e.target.value;
+            const val = parseFloat(e.target.value).toFixed(1);
+            document.getElementById('domainVal').innerText = `[-${val}, ${val}]`;
+            updateAll();
+        });
+
+        document.getElementById('resolution').addEventListener('input', (e) => {
+            params.resolution = e.target.value;
+            document.getElementById('resVal').innerText = `${e.target.value}x${e.target.value}`;
+            updateAll();
+        });
+
+        document.getElementById('showAuxCurves').addEventListener('change', (e) => {
+            params.showAuxCurves = e.target.checked;
+            buildAuxCurves();
+        });
+
+        document.getElementById('colorBySign').addEventListener('change', (e) => {
+            params.colorBySign = e.target.checked;
+            buildSurface();
+        });
+
+        document.getElementById('showWireframe').addEventListener('change', (e) => {
+            params.showWireframe = e.target.checked;
+            buildSurface();
+        });
+
+        document.getElementById('showGrid').addEventListener('change', (e) => {
+            gridHelper.visible = e.target.checked;
+        });
+
+        document.getElementById('resetCamBtn').addEventListener('click', () => {
+            camera.position.copy(defaultCamPos);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        // Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initial Build
+        updateAll();
+
+        // --- 7. Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            animate();
+            // Re-render MathJax to ensure beautiful typography
+            if (window.MathJax) {
+                MathJax.typesetPromise();
+            }
+        };
+    </script>
+</body>
+</html>
